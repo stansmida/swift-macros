@@ -21,6 +21,7 @@ let package = Package(
     dependencies: [
         // Depend on the Swift 5.9 release of SwiftSyntax
         .package(url: "https://github.com/apple/swift-syntax.git", from: "509.0.0"),
+        .package(url: "https://github.com/stansmida/swift-extras.git", from: "0.3.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -29,8 +30,9 @@ let package = Package(
         .macro(
             name: "MacrosImplementation",
             dependencies: [
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+                .product(name: "SwiftExtras", package: "swift-extras"),
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
-                .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
             ]
         ),
 
@@ -38,12 +40,20 @@ let package = Package(
         .target(name: "Macros", dependencies: ["MacrosImplementation"]),
 
         // A client of the library, which is able to use the macro in its own code.
-        .executableTarget(name: "Client", dependencies: ["Macros"]),
+        .executableTarget(
+            name: "Client",
+            dependencies: [
+                "Macros",
+                // Forwards `SwiftExtras` to make available expansion implementation calls (e.g. `isEqual(to:)`).
+                .product(name: "SwiftExtras", package: "swift-extras"),
+            ]
+        ),
 
         // A test target used to develop the macro implementation.
         .testTarget(
             name: "MacrosTests",
             dependencies: [
+                "Macros",
                 "MacrosImplementation",
                 .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
             ]

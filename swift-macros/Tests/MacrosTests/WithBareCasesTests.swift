@@ -1,3 +1,4 @@
+import Macros
 import SwiftSyntaxMacros
 import SwiftSyntaxMacrosTestSupport
 import XCTest
@@ -8,9 +9,14 @@ import MacrosImplementation
 
 final class BareCasesMacroTests: XCTestCase {
 
+    func testBareCases() {
+        XCTAssertEqual(E.a("hello").bareCase, .a)
+        XCTAssertEqual(Foo.x("dd").bar, .x)
+    }
+
     // Test the marco without any parameters, with completely omitted access level explicitly (from the parameter)
     // and implicitly (from the enum declaration).
-    func testMacroWithoutParameters() throws {
+    func testExpansionWithoutParameters() throws {
         assertMacroExpansion(
             """
             @WithBareCases
@@ -51,10 +57,10 @@ final class BareCasesMacroTests: XCTestCase {
     /// Test explicitly nil access - uses same access level modifier as the enum that the macro is attached to.
     /// Test custom type name.
     /// Test enum with intervening elements.
-    func testMacroWithParameters1() throws {
+    func testExpansionWithParameters1() throws {
         assertMacroExpansion(
             """
-            @WithBareCases(access: nil, typeName: "Foo")
+            @WithBareCases(accessModifier: nil, typeName: "Foo")
             public enum E: Whateverable {
                 enum Intervening {}
                 case a(A)
@@ -91,10 +97,10 @@ final class BareCasesMacroTests: XCTestCase {
     }
 
     // Test the marco with access parameter only.
-    func testMacroWithParameters2() throws {
+    func testExpansionWithParameters2() throws {
         assertMacroExpansion(
             """
-            @WithBareCases(access: .fileprivate)
+            @WithBareCases(accessModifier: .fileprivate)
             enum E {
                 case a(A)
                 case b(B, String)
@@ -127,6 +133,79 @@ final class BareCasesMacroTests: XCTestCase {
             """,
             macros: ["WithBareCases": WithBareCases.self]
         )
+    }
+
+    func testDiagnosticInvalidAccessModifier() {
+        assertMacroExpansion(
+            """
+            @WithBareCases(accessModifier: TypeAccessModifier.public)
+            enum WithInvalidAccessModifier {
+                case a(Void)
+            }
+            """,
+            expandedSource:
+            """
+            enum WithInvalidAccessModifier {
+                case a(Void)
+            }
+            """,
+            diagnostics: [.init(message: "Expansion type cannot have less restrictive access than its anchor declaration.", line: 1, column: 1)],
+            macros: ["WithBareCases": WithBareCases.self]
+        )
+    }
+
+    func testDiagnosticNoAssociatedValue() {
+        assertMacroExpansion(
+            """
+            @WithBareCases
+            enum NoAssociatedValue {
+                case a
+            }
+            """,
+            expandedSource:
+            """
+            enum NoAssociatedValue {
+                case a
+            }
+            """,
+            diagnostics: [.init(message: "'@WithBareCases' can only be attached to an enum with associated values.", line: 1, column: 1)],
+            macros: ["WithBareCases": WithBareCases.self]
+        )
+    }
+
+    func testDiagnosticCorruptedTypeName() {
+        assertMacroExpansion(
+            """
+            @WithBareCases(typeName: "Oh uh")
+            enum Whoops {
+                case a(String)
+            }
+            """,
+            expandedSource:
+            """
+            enum Whoops {
+                case a(String)
+            }
+            """,
+            diagnostics: [.init(message: "Invalid type name: 'Oh uh'.", line: 1, column: 1)],
+            macros: ["WithBareCases": WithBareCases.self]
+        )
+    }
+}
+
+private extension BareCasesMacroTests {
+
+    @WithBareCases
+    enum E {
+        case a(String)
+        case b(String, Int)
+        case c
+    }
+
+    @WithBareCases(accessModifier: TypeAccessModifier.fileprivate, typeName: "Bar")
+    enum Foo {
+        case x(String)
+        case y(String, Int)
     }
 }
 
