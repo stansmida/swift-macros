@@ -10,8 +10,8 @@ let package = Package(
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "Macros",
-            targets: ["Macros"]
+            name: "SwiftMacros",
+            targets: ["SwiftMacros"]
         ),
         .executable(
             name: "Client",
@@ -37,15 +37,21 @@ let package = Package(
         ),
 
         // Library that exposes a macro as part of its API, which is used in client programs.
-        .target(name: "Macros", dependencies: ["MacrosImplementation"]),
+        .target(
+            name: "SwiftMacros",
+            dependencies: [
+                "MacrosImplementation",
+                // Forwards `SwiftExtras` to make available expansion implementation calls (e.g. `isEqual(to:)`).
+                .product(name: "SwiftExtras", package: "swift-extras"),
+            ],
+            path: "Sources/Macros"
+        ),
 
         // A client of the library, which is able to use the macro in its own code.
         .executableTarget(
             name: "Client",
             dependencies: [
-                "Macros",
-                // Forwards `SwiftExtras` to make available expansion implementation calls (e.g. `isEqual(to:)`).
-                .product(name: "SwiftExtras", package: "swift-extras"),
+                "SwiftMacros"
             ]
         ),
 
@@ -53,7 +59,7 @@ let package = Package(
         .testTarget(
             name: "MacrosTests",
             dependencies: [
-                "Macros",
+                "SwiftMacros",
                 "MacrosImplementation",
                 .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
             ]
