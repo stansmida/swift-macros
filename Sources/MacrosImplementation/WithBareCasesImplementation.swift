@@ -1,5 +1,6 @@
 import SwiftDiagnostics
 import SwiftExtras
+import SwiftSyntaxExtras
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
@@ -44,11 +45,11 @@ public enum WithBareCases: MemberMacro {
         providingMembersOf declaration: some SwiftSyntax.DeclGroupSyntax,
         in context: some SwiftSyntaxMacros.MacroExpansionContext
     ) throws -> [SwiftSyntax.DeclSyntax] {
-
-        guard let enumDeclSyntax = declaration.as(EnumDeclSyntax.self) else {
+        let declSyntax = try DeclSyntaxScanner(declSyntax: declaration, at: node)
+        let attribute = AttributeSyntaxScanner(node: node)
+        guard case .enum(let enumDeclSyntax) = declSyntax.type else {
             throw Diagnostic.invalidDeclarationGroupType(declaration, expected: [EnumDeclSyntax.self]).error(at: node)
         }
-
         let caseElements = enumDeclSyntax.memberBlock.members.compactMap { member in
             member.decl.as(EnumCaseDeclSyntax.self)?.elements.first!
         }
@@ -56,12 +57,12 @@ public enum WithBareCases: MemberMacro {
             throw Diagnostic.invalidDeclaration("'@\(Self.self)' can only be attached to an enum with associated values.").error(at: node)
         }
 
-        let accessModifier = try Extract.typeAccessLevelModifier(explicit: node, implicit: enumDeclSyntax.modifiers).map({ "\($0.rawValue) " }) ?? ""
+        let accessModifier = try TypeAccessModifier(declSyntax: declaration, at: node)
 
-        let typeName = try Extract.attributeArgument(node, withLabel: "typeName") ?? "BareCase"
+        let typeName = try attribute.stringLiteralArgument(with: "typeName") ?? "BareCase"
 
         // We make the expansion type `Hashable`. Obvious benefit "for free".
-        let expansionEnumDeclSyntax = try EnumDeclSyntax("\(raw: accessModifier)enum \(raw: typeName): Hashable") {
+        let expansionEnumDeclSyntax = try EnumDeclSyntax("\(raw: accessModifier.stringWithSpaceAfter)enum \(raw: typeName): Hashable") {
             for caseElement in caseElements {
                 try EnumCaseDeclSyntax("case \(caseElement.name)")
             }
@@ -73,7 +74,7 @@ public enum WithBareCases: MemberMacro {
 
         let propertyName = typeName.lowercasedFirst
         let expansionPropertyDeclSyntax = try VariableDeclSyntax(
-            "\(raw: accessModifier)var \(raw: propertyName): \(raw: typeName)",
+            "\(raw: accessModifier.stringWithSpaceAfter)var \(raw: propertyName): \(raw: typeName)",
             accessor: {
                 try SwitchExprSyntax("switch self") {
                     for caseElement in caseElements {
@@ -90,7 +91,7 @@ public enum WithBareCases: MemberMacro {
 
         return [
             DeclSyntax(expansionEnumDeclSyntax),
-            DeclSyntax(expansionPropertyDeclSyntax)
+            DeclSyntax(expansionPropertyDeclSyntax),
         ]
     }
 }
