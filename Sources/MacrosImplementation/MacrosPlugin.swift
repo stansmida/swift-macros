@@ -5,6 +5,6 @@ import SwiftSyntaxMacros
 struct MacrosPlugin: CompilerPlugin {
     
     let providingMacros: [Macro.Type] = [
-        WithBareCases.self,
+        BareProviding.self,
     ]
 }

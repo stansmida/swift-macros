@@ -1,17 +1,17 @@
 import SwiftDiagnostics
 import SwiftExtras
-import SwiftSyntaxExtras
 import SwiftSyntax
 import SwiftSyntaxBuilder
+import SwiftSyntaxExtras
 import SwiftSyntaxMacros
 
-/// Implementation of the `WithBareCases` macro, which takes a declaration of
+/// Implementation of the `BareProviding` macro, which takes a declaration of
 /// enum with associated value and produces nested enum type with same cases
 /// without associated values.
 ///
 /// For example
 ///
-///     @WithBareCases
+///     @BareProviding
 ///     enum E {
 ///         case a(String)
 ///         case b(String, Int)
@@ -19,17 +19,16 @@ import SwiftSyntaxMacros
 ///
 /// expands as
 ///
-///     @WithBareCases
 ///     enum E {
 ///         case a(String)
 ///         case b(String, Int)
 ///
-///         enum BareCase: Hashable {
+///         enum Bare: Hashable {
 ///             case a
 ///             case b
 ///         }
 ///
-///         var bareCase: BareCase {
+///         var bare: Bare {
 ///             switch self {
 ///                 case .a:
 ///                     .a
@@ -38,19 +37,25 @@ import SwiftSyntaxMacros
 ///             }
 ///         }
 ///     }
-public enum WithBareCases: MemberMacro {
+public enum BareProviding: MemberMacro {
 
     public static func expansion(
         of node: SwiftSyntax.AttributeSyntax,
         providingMembersOf declaration: some SwiftSyntax.DeclGroupSyntax,
         in context: some SwiftSyntaxMacros.MacroExpansionContext
     ) throws -> [SwiftSyntax.DeclSyntax] {
-        let declSyntax = try DeclSyntaxScanner(declSyntax: declaration, at: node)
+        
+        let anchorDecl = try DeclSyntaxScanner(declSyntax: declaration, at: node)
         let attribute = AttributeSyntaxScanner(node: node)
-        guard case .enum(let enumDeclSyntax) = declSyntax.type else {
-            throw Diagnostic.invalidDeclarationGroupType(declaration, expected: [EnumDeclSyntax.self]).error(at: node)
+        
+        guard case .enum(let enumDecl) = anchorDecl.type else {
+            throw Diagnostic.invalidDeclarationGroupType(
+                declaration,
+                expected: [EnumDeclSyntax.self]
+            )
+            .error(at: node)
         }
-        let caseElements = enumDeclSyntax.memberBlock.members.compactMap { member in
+        let caseElements = enumDecl.memberBlock.members.compactMap { member in
             member.decl.as(EnumCaseDeclSyntax.self)?.elements.first!
         }
         guard caseElements.contains(where: { $0.parameterClause != nil }) else {
@@ -58,17 +63,18 @@ public enum WithBareCases: MemberMacro {
         }
 
         let accessModifier = try TypeAccessModifier(declSyntax: declaration, at: node)
+        let typeName = try attribute.stringLiteralArgument(with: "typeName") ?? "Bare"
 
-        let typeName = try attribute.stringLiteralArgument(with: "typeName") ?? "BareCase"
-
-        // We make the expansion type `Hashable`. Obvious benefit "for free".
-        let expansionEnumDeclSyntax = try EnumDeclSyntax("\(raw: accessModifier.stringWithSpaceAfter)enum \(raw: typeName): Hashable") {
+        let expansionEnumDecl = try EnumDeclSyntax(
+            "\(raw: accessModifier.stringWithSpaceAfter)enum \(raw: typeName): Hashable"
+        ) {
             for caseElement in caseElements {
                 try EnumCaseDeclSyntax("case \(caseElement.name)")
             }
         }
+
         // Check the type name is as expected.
-        guard expansionEnumDeclSyntax.name.text == typeName else {
+        guard expansionEnumDecl.name.text == typeName else {
             throw Diagnostic.invalidArgument("Invalid type name: '\(typeName)'.").error(at: node)
         }
 
@@ -83,14 +89,15 @@ public enum WithBareCases: MemberMacro {
                 }
             }
         )
-        // Check the type name is as expected.
+
+        // Check the property name is as expected.
         let expansionPropertyName = expansionPropertyDeclSyntax.bindings.first?.as(PatternBindingSyntax.self)?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
         guard expansionPropertyName == propertyName else {
             throw Diagnostic.invalidArgument("Invalid type name: '\(typeName)'.").error(at: node)
         }
 
         return [
-            DeclSyntax(expansionEnumDeclSyntax),
+            DeclSyntax(expansionEnumDecl),
             DeclSyntax(expansionPropertyDeclSyntax),
         ]
     }

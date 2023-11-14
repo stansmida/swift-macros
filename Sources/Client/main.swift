@@ -1,1 +1,1 @@
-WithBareCasesRun.run()
+BareProvidingRun.run()

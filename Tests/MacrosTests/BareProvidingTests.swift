@@ -6,20 +6,18 @@ import XCTest
 // Macro implementations build for the host, so the corresponding module is not available when cross-compiling. Cross-compiled tests may still make use of the macro itself in end-to-end tests.
 #if canImport(MacrosImplementation)
 import MacrosImplementation
+#endif
 
-final class BareCasesMacroTests: XCTestCase {
+final class BareProvidingExpansionTests: XCTestCase {
 
-    func testBareCases() {
-        XCTAssertEqual(E.a("hello").bareCase, .a)
-        XCTAssertEqual(Foo.x("dd").bar, .x)
-    }
+    #if canImport(MacrosImplementation)
 
     // Test the marco without any parameters, with completely omitted access level explicitly (from the parameter)
     // and implicitly (from the enum declaration).
     func testExpansionWithoutParameters() throws {
         assertMacroExpansion(
             """
-            @WithBareCases
+            @BareProviding
             enum E {
                 case a(A)
                 case b(B, String)
@@ -32,13 +30,13 @@ final class BareCasesMacroTests: XCTestCase {
                 case b(B, String)
                 case cA
 
-                enum BareCase: Hashable {
+                enum Bare: Hashable {
                     case a
                     case b
                     case cA
                 }
 
-                var bareCase: BareCase {
+                var bare: Bare {
                     switch self {
                     case .a:
                         .a
@@ -50,7 +48,7 @@ final class BareCasesMacroTests: XCTestCase {
                 }
             }
             """,
-            macros: ["WithBareCases": WithBareCases.self]
+            macros: ["BareProviding": BareProviding.self]
         )
     }
 
@@ -60,7 +58,7 @@ final class BareCasesMacroTests: XCTestCase {
     func testExpansionWithParameters1() throws {
         assertMacroExpansion(
             """
-            @WithBareCases(accessModifier: nil, typeName: "Foo")
+            @BareProviding(accessModifier: nil, typeName: "Foo")
             public enum E: Whateverable {
                 enum Intervening {}
                 case a(A)
@@ -92,7 +90,7 @@ final class BareCasesMacroTests: XCTestCase {
                 }
             }
             """,
-            macros: ["WithBareCases": WithBareCases.self]
+            macros: ["BareProviding": BareProviding.self]
         )
     }
 
@@ -100,7 +98,7 @@ final class BareCasesMacroTests: XCTestCase {
     func testExpansionWithParameters2() throws {
         assertMacroExpansion(
             """
-            @WithBareCases(accessModifier: .fileprivate)
+            @BareProviding(accessModifier: .fileprivate)
             enum E {
                 case a(A)
                 case b(B, String)
@@ -113,13 +111,13 @@ final class BareCasesMacroTests: XCTestCase {
                 case b(B, String)
                 case cA
 
-                fileprivate enum BareCase: Hashable {
+                fileprivate enum Bare: Hashable {
                     case a
                     case b
                     case cA
                 }
 
-                fileprivate var bareCase: BareCase {
+                fileprivate var bare: Bare {
                     switch self {
                     case .a:
                         .a
@@ -131,14 +129,14 @@ final class BareCasesMacroTests: XCTestCase {
                 }
             }
             """,
-            macros: ["WithBareCases": WithBareCases.self]
+            macros: ["BareProviding": BareProviding.self]
         )
     }
 
     func testDiagnosticInvalidAccessModifier() {
         assertMacroExpansion(
             """
-            @WithBareCases(accessModifier: TypeAccessModifier.public)
+            @BareProviding(accessModifier: TypeAccessModifier.public)
             enum WithInvalidAccessModifier {
                 case a(Void)
             }
@@ -150,14 +148,14 @@ final class BareCasesMacroTests: XCTestCase {
             }
             """,
             diagnostics: [.init(message: "Expansion type cannot have less restrictive access than its anchor declaration.", line: 1, column: 1)],
-            macros: ["WithBareCases": WithBareCases.self]
+            macros: ["BareProviding": BareProviding.self]
         )
     }
 
     func testDiagnosticNoAssociatedValue() {
         assertMacroExpansion(
             """
-            @WithBareCases
+            @BareProviding
             enum NoAssociatedValue {
                 case a
             }
@@ -168,15 +166,15 @@ final class BareCasesMacroTests: XCTestCase {
                 case a
             }
             """,
-            diagnostics: [.init(message: "'@WithBareCases' can only be attached to an enum with associated values.", line: 1, column: 1)],
-            macros: ["WithBareCases": WithBareCases.self]
+            diagnostics: [.init(message: "'@BareProviding' can only be attached to an enum with associated values.", line: 1, column: 1)],
+            macros: ["BareProviding": BareProviding.self]
         )
     }
 
     func testDiagnosticCorruptedTypeName() {
         assertMacroExpansion(
             """
-            @WithBareCases(typeName: "Oh uh")
+            @BareProviding(typeName: "Oh uh")
             enum Whoops {
                 case a(String)
             }
@@ -188,25 +186,36 @@ final class BareCasesMacroTests: XCTestCase {
             }
             """,
             diagnostics: [.init(message: "Invalid type name: 'Oh uh'.", line: 1, column: 1)],
-            macros: ["WithBareCases": WithBareCases.self]
+            macros: ["BareProviding": BareProviding.self]
         )
     }
-}
 
-private extension BareCasesMacroTests {
+    #else
 
-    @WithBareCases
-    enum E {
-        case a(String)
-        case b(String, Int)
-        case c
+    func testExpansions() throws {
+        XCTSkip("macros are only supported when running tests for the host platform")
     }
 
-    @WithBareCases(accessModifier: TypeAccessModifier.fileprivate, typeName: "Bar")
-    enum Foo {
-        case x(String)
-        case y(String, Int)
+    #endif
+}
+
+final class BareProvidingTests: XCTestCase {
+
+    func testBareProviding() {
+        XCTAssertEqual(E.a("hello").bare, .a)
+        XCTAssertEqual(Foo.x("dd").bar, .x)
     }
 }
 
-#endif
+@BareProviding
+enum E {
+    case a(String)
+    case b(String, Int)
+    case c
+}
+
+@BareProviding(accessModifier: TypeAccessModifier.fileprivate, typeName: "Bar")
+enum Foo {
+    case x(String)
+    case y(String, Int)
+}
