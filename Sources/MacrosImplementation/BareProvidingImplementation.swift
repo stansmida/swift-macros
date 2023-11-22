@@ -55,8 +55,8 @@ public enum BareProviding: MemberMacro {
             )
             .error(at: node)
         }
-        let caseElements = enumDecl.memberBlock.members.compactMap { member in
-            member.decl.as(EnumCaseDeclSyntax.self)?.elements.first!
+        let caseElements: [EnumCaseElementSyntax] = enumDecl.memberBlock.members.flatMap { member in
+            member.decl.as(EnumCaseDeclSyntax.self)?.elements.map { $0 } ?? []
         }
         guard caseElements.contains(where: { $0.parameterClause != nil }) else {
             throw Diagnostic.invalidDeclaration("'@\(Self.self)' can only be attached to an enum with associated values.").error(at: node)

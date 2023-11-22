@@ -8,6 +8,7 @@ enum BareProvidingRun {
         print(Foo.Bar.self)
         assert(E.a("hello").bare == .a)
         assert(Foo.x("dd").bar == .x)
+        assert(Inline.e(true, 0).bare == .e)
     }
 }
 
@@ -22,4 +23,11 @@ enum E {
 enum Foo {
     case x(String)
     case y(String, Int)
+}
+
+@BareProviding()
+enum Inline {
+    case a(String, Int), b(Int), c(Int, Bool)
+    case d
+    case e(Bool, Int), f
 }

@@ -52,6 +52,53 @@ final class BareProvidingExpansionTests: XCTestCase {
         )
     }
 
+    func testExpansionWithInlineCasesDeclaration() throws {
+        assertMacroExpansion(
+            """
+            @BareProviding
+            enum E {
+                case a(A), b(B, String), c
+                case d, e(Bool)
+                case f
+            }
+            """,
+            expandedSource: """
+            enum E {
+                case a(A), b(B, String), c
+                case d, e(Bool)
+                case f
+
+                enum Bare: Hashable {
+                    case a
+                    case b
+                    case c
+                    case d
+                    case e
+                    case f
+                }
+
+                var bare: Bare {
+                    switch self {
+                    case .a:
+                        .a
+                    case .b:
+                        .b
+                    case .c:
+                        .c
+                    case .d:
+                        .d
+                    case .e:
+                        .e
+                    case .f:
+                        .f
+                    }
+                }
+            }
+            """,
+            macros: ["BareProviding": BareProviding.self]
+        )
+    }
+
     /// Test explicitly nil access - uses same access level modifier as the enum that the macro is attached to.
     /// Test custom type name.
     /// Test enum with intervening elements.
