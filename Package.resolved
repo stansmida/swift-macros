@@ -23,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/stansmida/swift-syntax-extras.git",
       "state" : {
-        "revision" : "3b606bc6ef97e1dc2af63e440a10dd6c758dfa03",
-        "version" : "0.3.2"
+        "revision" : "2a7ee78776f1702b8c86464d0e1d1a5fdcfbf260",
+        "version" : "0.4.1"
       }
     }
   ],

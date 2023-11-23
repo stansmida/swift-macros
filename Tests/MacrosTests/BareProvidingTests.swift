@@ -14,7 +14,7 @@ final class BareProvidingExpansionTests: XCTestCase {
 
     // Test the marco without any parameters, with completely omitted access level explicitly (from the parameter)
     // and implicitly (from the enum declaration).
-    func testExpansionWithoutParameters() throws {
+    func testExpansion_whenWithoutParameters_shouldWork() throws {
         assertMacroExpansion(
             """
             @BareProviding
@@ -52,7 +52,7 @@ final class BareProvidingExpansionTests: XCTestCase {
         )
     }
 
-    func testExpansionWithInlineCasesDeclaration() throws {
+    func testExpansion_whenWithInlineCasesDeclaration_shouldExpandAll() throws {
         assertMacroExpansion(
             """
             @BareProviding
@@ -99,10 +99,8 @@ final class BareProvidingExpansionTests: XCTestCase {
         )
     }
 
-    /// Test explicitly nil access - uses same access level modifier as the enum that the macro is attached to.
-    /// Test custom type name.
-    /// Test enum with intervening elements.
-    func testExpansionWithParameters1() throws {
+    /// Tests also with intervening elements.
+    func testExpansion_whenNilAccessModifier_shouldUseDeclarationAccessLevel() throws {
         assertMacroExpansion(
             """
             @BareProviding(accessModifier: nil, typeName: "Foo")
@@ -141,8 +139,7 @@ final class BareProvidingExpansionTests: XCTestCase {
         )
     }
 
-    // Test the marco with access parameter only.
-    func testExpansionWithParameters2() throws {
+    func testExpansion_whenExplicitAccessModifierOnly_shouldUseIt() throws {
         assertMacroExpansion(
             """
             @BareProviding(accessModifier: .fileprivate)
@@ -180,7 +177,91 @@ final class BareProvidingExpansionTests: XCTestCase {
         )
     }
 
-    func testDiagnosticInvalidAccessModifier() {
+    func testExpansion_whenExplicitAndImplicitAccessModifier_shouldUseExplicit() throws {
+        assertMacroExpansion(
+            """
+            @BareProviding(accessModifier: .fileprivate)
+            public enum E {
+                case a(A)
+            }
+            """,
+            expandedSource: """
+            public enum E {
+                case a(A)
+
+                fileprivate enum Bare: Hashable {
+                    case a
+                }
+
+                fileprivate var bare: Bare {
+                    switch self {
+                    case .a:
+                        .a
+                    }
+                }
+            }
+            """,
+            macros: ["BareProviding": BareProviding.self]
+        )
+    }
+
+    func testExpansion_whenPrivate_shouldExpandAsFileprivate() throws {
+        assertMacroExpansion(
+            """
+            @BareProviding
+            private enum E {
+                case a(A)
+            }
+            """,
+            expandedSource: """
+            private enum E {
+                case a(A)
+
+                fileprivate enum Bare: Hashable {
+                    case a
+                }
+
+                fileprivate var bare: Bare {
+                    switch self {
+                    case .a:
+                        .a
+                    }
+                }
+            }
+            """,
+            macros: ["BareProviding": BareProviding.self]
+        )
+    }
+
+    func testExpansion_whenExplicitTypeName_shouldUseIt() throws {
+        assertMacroExpansion(
+            """
+            @BareProviding(typeName: "Baz")
+            enum E {
+                case a(A)
+            }
+            """,
+            expandedSource: """
+            enum E {
+                case a(A)
+
+                enum Baz: Hashable {
+                    case a
+                }
+
+                var baz: Baz {
+                    switch self {
+                    case .a:
+                        .a
+                    }
+                }
+            }
+            """,
+            macros: ["BareProviding": BareProviding.self]
+        )
+    }
+
+    func testExpansion_whenInvalidAccessModifier_shouldEmitDiagnostic() {
         assertMacroExpansion(
             """
             @BareProviding(accessModifier: TypeAccessModifier.public)
@@ -199,7 +280,7 @@ final class BareProvidingExpansionTests: XCTestCase {
         )
     }
 
-    func testDiagnosticNoAssociatedValue() {
+    func testExpansion_whenNoAssociatedValue_shouldEmitDiagnostic() {
         assertMacroExpansion(
             """
             @BareProviding
@@ -218,7 +299,7 @@ final class BareProvidingExpansionTests: XCTestCase {
         )
     }
 
-    func testDiagnosticCorruptedTypeName() {
+    func testExpansion_whenCorruptedTypeName_shouldEmitDiagnostic() {
         assertMacroExpansion(
             """
             @BareProviding(typeName: "Oh uh")
@@ -248,14 +329,14 @@ final class BareProvidingExpansionTests: XCTestCase {
 
 final class BareProvidingTests: XCTestCase {
 
-    func testBareProviding() {
+    func testBareProviding_whenComparingAnchorWithBareCounterpart_shouldEqual() {
         XCTAssertEqual(E.a("hello").bare, .a)
         XCTAssertEqual(Foo.x("dd").bar, .x)
     }
 }
 
 @BareProviding
-enum E {
+private enum E {
     case a(String)
     case b(String, Int)
     case c

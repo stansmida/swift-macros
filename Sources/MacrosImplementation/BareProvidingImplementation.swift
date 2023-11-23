@@ -39,66 +39,75 @@ import SwiftSyntaxMacros
 ///     }
 public enum BareProviding: MemberMacro {
 
+    private static let accessModifierLabel = "accessModifier"
+
     public static func expansion(
         of node: SwiftSyntax.AttributeSyntax,
         providingMembersOf declaration: some SwiftSyntax.DeclGroupSyntax,
         in context: some SwiftSyntaxMacros.MacroExpansionContext
     ) throws -> [SwiftSyntax.DeclSyntax] {
-        
-        let anchorDecl = try DeclSyntaxScanner(declSyntax: declaration, at: node)
-        let attribute = AttributeSyntaxScanner(node: node)
-        
-        guard case .enum(let enumDecl) = anchorDecl.type else {
-            throw Diagnostic.invalidDeclarationGroupType(
-                declaration,
-                expected: [EnumDeclSyntax.self]
-            )
-            .error(at: node)
-        }
-        let caseElements: [EnumCaseElementSyntax] = enumDecl.memberBlock.members.flatMap { member in
-            member.decl.as(EnumCaseDeclSyntax.self)?.elements.map { $0 } ?? []
-        }
-        guard caseElements.contains(where: { $0.parameterClause != nil }) else {
-            throw Diagnostic.invalidDeclaration("'@\(Self.self)' can only be attached to an enum with associated values.").error(at: node)
-        }
 
-        let accessModifier = try TypeAccessModifier(declSyntax: declaration, at: node)
-        let typeName = try attribute.stringLiteralArgument(with: "typeName") ?? "Bare"
+        do {
 
-        let expansionEnumDecl = try EnumDeclSyntax(
-            "\(raw: accessModifier.stringWithSpaceAfter)enum \(raw: typeName): Hashable"
-        ) {
-            for caseElement in caseElements {
-                try EnumCaseDeclSyntax("case \(caseElement.name)")
+            let anchorDecl = try DeclSyntaxScanner(declSyntax: declaration)
+            let attribute = AttributeSyntaxScanner(node: node)
+
+            guard case .enum(let enumDecl) = anchorDecl.type else {
+                throw Diagnostic.invalidDeclarationGroupType(
+                    declaration,
+                    expected: [EnumDeclSyntax.self]
+                )
+                .error(at: node)
             }
-        }
+            let caseElements: [EnumCaseElementSyntax] = enumDecl.memberBlock.members.flatMap { member in
+                member.decl.as(EnumCaseDeclSyntax.self)?.elements.map { $0 } ?? []
+            }
+            guard caseElements.contains(where: { $0.parameterClause != nil }) else {
+                throw Diagnostic.invalidDeclaration("'@\(Self.self)' can only be attached to an enum with associated values.").error(at: node)
+            }
 
-        // Check the type name is as expected.
-        guard expansionEnumDecl.name.text == typeName else {
-            throw Diagnostic.invalidArgument("Invalid type name: '\(typeName)'.").error(at: node)
-        }
+            let accessModifier = try TypeAccessModifier(withLabel: accessModifierLabel, in: declaration, at: node)
+            let memberAccessModifierWithSpaceAfter = accessModifier.map { String(describing: $0.memberDerivate) + " " } ?? ""
 
-        let propertyName = typeName.lowercasedFirst
-        let expansionPropertyDeclSyntax = try VariableDeclSyntax(
-            "\(raw: accessModifier.stringWithSpaceAfter)var \(raw: propertyName): \(raw: typeName)",
-            accessor: {
-                try SwitchExprSyntax("switch self") {
-                    for caseElement in caseElements {
-                        SwitchCaseSyntax("case .\(caseElement.name): .\(caseElement.name)")
-                    }
+            let typeName = try attribute.stringLiteralArgument(with: "typeName") ?? "Bare"
+
+            let expansionEnumDecl = try EnumDeclSyntax(
+                "\(raw: memberAccessModifierWithSpaceAfter)enum \(raw: typeName): Hashable"
+            ) {
+                for caseElement in caseElements {
+                    try EnumCaseDeclSyntax("case \(caseElement.name)")
                 }
             }
-        )
 
-        // Check the property name is as expected.
-        let expansionPropertyName = expansionPropertyDeclSyntax.bindings.first?.as(PatternBindingSyntax.self)?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
-        guard expansionPropertyName == propertyName else {
-            throw Diagnostic.invalidArgument("Invalid type name: '\(typeName)'.").error(at: node)
+            // Check the type name is as expected.
+            guard expansionEnumDecl.name.text == typeName else {
+                throw Diagnostic.invalidArgument("Invalid type name: '\(typeName)'.").error(at: node)
+            }
+
+            let propertyName = typeName.lowercasedFirst
+            let expansionPropertyDeclSyntax = try VariableDeclSyntax(
+                "\(raw: memberAccessModifierWithSpaceAfter)var \(raw: propertyName): \(raw: typeName)",
+                accessor: {
+                    try SwitchExprSyntax("switch self") {
+                        for caseElement in caseElements {
+                            SwitchCaseSyntax("case .\(caseElement.name): .\(caseElement.name)")
+                        }
+                    }
+                }
+            )
+
+            // Check the property name is as expected.
+            let expansionPropertyName = expansionPropertyDeclSyntax.bindings.first?.as(PatternBindingSyntax.self)?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+            guard expansionPropertyName == propertyName else {
+                throw Diagnostic.invalidArgument("Invalid type name: '\(typeName)'.").error(at: node)
+            }
+
+            return [
+                DeclSyntax(expansionEnumDecl),
+                DeclSyntax(expansionPropertyDeclSyntax),
+            ]
+        } catch {
+            throw error.diagnosticError(at: node)
         }
-
-        return [
-            DeclSyntax(expansionEnumDecl),
-            DeclSyntax(expansionPropertyDeclSyntax),
-        ]
     }
 }
