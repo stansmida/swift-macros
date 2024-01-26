@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/stansmida/swift-extras.git",
       "state" : {
-        "revision" : "936500a22c074e336f0c983fd8fa43e84aceb6d6",
-        "version" : "0.4.0"
+        "revision" : "beced210c6290dcff1c0aefbce2ea572c4691e13",
+        "version" : "0.7.4"
       }
     },
     {
@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-syntax.git",
       "state" : {
-        "revision" : "74203046135342e4a4a627476dd6caf8b28fe11b",
-        "version" : "509.0.0"
+        "revision" : "64889f0c732f210a935a0ad7cda38f77f876262d",
+        "version" : "509.1.1"
       }
     },
     {
